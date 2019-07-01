@@ -4,6 +4,8 @@ from pymoo.algorithms.nsga3 import nsga3
 from pymoo.util import plotting
 from pymop.factory import get_problem
 
+#This is to test various provided functions
+
 # load a test or define your own problem
 problem = get_problem("zdt1")
 
