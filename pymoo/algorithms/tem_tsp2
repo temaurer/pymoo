@@ -1,0 +1,223 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Jul  2 14:30:49 2019
+
+@author: temau
+"""
+import numpy as np
+import autograd.numpy as anp
+from pymop.problem import Problem
+from pymoo.algorithms.unsga3 import unsga3
+from pymoo.optimize import minimize
+from datetime import datetime
+import matplotlib.pyplot as plt
+
+#In nsga3, the default values for crossover and mutation were changed
+#Changed:
+#   SimulatedBinaryCrossover(prob=0.8, eta=30)
+#   PolynomialMutation(prob=0.1, eta=20)
+
+#Original:
+#   SimulatedBinaryCrossover(prob=1.0, eta=30))
+#   PolynomialMutation(prob=None, eta=20))
+
+startTime = datetime.now()
+
+
+def _City(cities):    
+    city_num = int(cities.size/2)
+    #print(city_num)
+    dist_Mat = np.zeros((city_num,city_num))
+    for i in range(city_num):
+        for j in range(city_num):
+            p_1 = cities[i]
+            p_2 = cities[j]
+            dist = np.sqrt((p_1[0] - p_2[0])**2 + (p_1[1] - p_2[1])**2)
+            dist_Mat[i][j] = dist
+    #print(dist_Mat)
+    return dist_Mat
+
+#shanghai,beijing,hong kong, singapore, xiamen, tokyo, bangkok, ho chi minh city
+#cities = np.array([[31.2304, 121.4737],[39.9042,116.4074],[22.3193,114.1694],[1.3521,103.8198],[24.45964,118.08954],[35.68321,139.80894],[13.75335,100.50483],[10.77824,106.70324]])
+cities = np.array([[1304, 2312], [3639, 1315], [4177, 2244], [3712, 1399], [3488, 1535], [3326, 1556], [3238, 1229], [4196, 1004], [4312, 790], [4386, 570], [3007, 1970], [2562, 1756], [2788, 1491], [2381, 1676], [1332, 695], [3715, 1678], [3918, 2179], [4061, 2370], [3780, 2212], [3676, 2578], [4029, 2838], [4263, 2931], [3429, 1908], [3507, 2367], [3394, 2643], [3439, 3201], [2935, 3240], [3140, 3550], [2545, 2357], [2778, 2826], [2370, 2975]])
+
+dist_Mat = _City(cities)
+
+def _getDist(dist_Mat, index):
+    #whole population for one generation passed in
+    #print("These are the indices: ")
+    #print(index)
+        # np.argsort(index)
+    
+    
+
+    #print("Temp_resx: ")
+    #print(temp_resx)
+    (r,c) = index.shape
+    city_order = np.zeros((r,c))
+    c = float(c)
+    for k in range(r):
+        for i in range(int(c)):
+            #temp_resx[k][i] = index[k][i]
+            print("This is an index element")
+            print(index[k][i])
+        for i in range(int(c)):
+            for j in range(int(c)):
+               if index[k][i]<((j+1)*1./c) :
+                    city_order[k][i] = int(j)
+                    break
+            if index[k][i]>=1:
+                city_order[k][i] = int(c)
+    #print("This is the city order:")
+    city_order = city_order.astype(int)
+    #print(city_order)            
+        
+    #change mapping method from real number to integral number in order to prevent sequences that already exist
+    city_num = len(dist_Mat)
+    #print("city_order: ")
+    #print(city_order.shape)
+    #print(city_order)
+    (r,c) = city_order.shape
+    #f is 2-D: population number, number of objectives
+    f = np.zeros((800,1))
+    #print(np.size(f))
+    #og_dist = np.zeros((800,1))
+    for j in range(r):
+        #d_tot = 0
+        #d_pen = 0
+        duplicate = []
+        for w in range(city_num):
+            found = False
+            for i in range(city_num):
+                if city_order[j][i] == w:
+                    found = True
+            if found==False:
+                duplicate.append(w)
+        for i in range(city_num):
+            for w in range(city_num):
+                if i!=w:
+                    if city_order[j][i] == city_order[j][w]:
+                        temp = duplicate.pop(0)
+                        city_order[j][i] = temp
+                        temp_resx[j][i] = temp*1./c + 1./c*np.random.uniform(0,1)
+                        #d_pen += 10000
+#                        print("D_pen \n j: %d \n i: %d \n w: %d " %(j,i,w))
+#                        print(d_pen)
+#                        print("left hand side")
+#                        print(city_order[j][i])
+#                        print("right hand side")
+#                        print(city_order[j][w])
+#                        
+        d_tot = 0            
+        for i in range(city_num):
+            d_tot += dist_Mat[(city_order[j][i])][city_order[j][np.mod(i+1,city_num)]]
+            
+        #add another objective that is constant value
+        #print("This is d_tot: ")
+        #print(d_tot)
+        #d_pen = d_tot + (d_tot - 15000) * 1000
+        f[j] =d_tot #+ d_pen
+    #    og_dist[j] = d_tot
+    #print("This is f: ")
+    #print(f)
+    #best_of_gen.append(og_dist[31])
+#   sum(anp.power(x, 2) - self.const_1 * anp.cos(2 * anp.pi * x), axis=1) 
+    #return d_tot
+    #out["F"] = anp.sum(d_tot, axis=0)
+    return f
+
+# always derive from the main problem for the evaluation
+class MyProblem(Problem):
+    def __init__(self, const_1=5, const_2=0.1):
+        # define lower and upper bounds -  1d array with length equal to number of variable
+        xl = 0 * anp.ones(31)
+        xu = 1 * anp.ones(31)
+        #set the number of variables, number of objectives, number of constraints, lower and upper limit, respectively
+        super().__init__(n_var=31, n_obj=1, n_constr=0, xl=xl, xu=xu, evaluation_of="auto")
+
+        # store custom variables needed for evaluation
+        #self.const_1 = const_1
+        #self.const_2 = const_2
+        
+    # implemented the function evaluation function - the arrays to fill are provided directly
+    #note that index is is entire population for one generation
+    def _evaluate(self,index, out, *args, **kwargs):
+        # an objective function to be evaluated using set of city vars
+        f = _getDist(dist_Mat,index)
+        #f is single value of optimized function (because single objective) for each population member, so a 1D array the size of population output for F
+        #not quite sure yet what exactly f is supposed to be when multi-objective
+        out["F"] = f
+        #G is constraints for entire generation (size should be (pop_size, const_num))
+        #out["G"] = np.zeros((10,1))
+        # !!! only if a constraint value is positive it is violated !!!
+        # set the constraint that x1 + x2 > var2
+
+        # set the constraint that x3 + x4 < var2
+        #g2 = self.const_2 - (x[:, 2] + x[:, 3])
+        #g1 = (x[:, 0] + x[:, 1]) - self.const_2
+
+           
+    
+best_of_gen = []
+problem = MyProblem()
+temp_resx = np.zeros((800,31))
+#anp.random.rand(100,8) initializes first generation (parents) as 100 arrays of 8 vals 0-1
+F, G, CV, feasible, dF, dG = problem.evaluate(np.random.rand(800, 31), 
+                                              return_values_of=["F", "G", "CV", "feasible", "dF", "dG"])
+# get the optimal solution of the problem for the purpose of comparison
+pf = problem.pareto_front()
+
+# create the algorithm object
+method = unsga3(ref_dirs=np.array([[15000.]]), pop_size=800, elimate_duplicates=True)
+
+
+#note: the parameters of population and generation influence the performance greatly
+#The parameters of probability of mutation and crossover were not found to be significant
+# execute the optimization
+res = minimize(problem,
+                  method,
+                  termination=('n_gen', 10),
+                  pf=pf,
+                  disp=True)
+comput_time = datetime.now() - startTime
+print("The time for the program to terminate: %s" %comput_time)
+var_real = res.X.astype(np.float)
+print("This is var_real")
+print(var_real)
+var_order = np.zeros((1,31))
+c = 31
+for i in range(int(c)):
+    for j in range(int(c)):
+       if var_real[i]<(1./c+j*1./c) :
+            var_order[0][i] = int(j)
+            break
+    if var_real[i]>=1:
+        var_order[0][i] = int(c)
+#print("This is the city order:")
+var_order = var_order.astype(int)
+print("Best solution found: %s" % var_order)
+print("Function value: %s" % res.F)
+#var = res.X.astype(np.int))
+#print("City order: %s" %np.argsort(var))
+city_graph_x = []
+city_graph_y = []
+for i in range(len(var_order)):
+    city_graph_x.append(cities[i][0])
+    city_graph_y.append(cities[i][1])
+city_graph_x.append(cities[0][0])
+city_graph_y.append(cities[0][1])
+f1 = plt.figure(1)
+plt.plot(city_graph_x, city_graph_y, color='green', linestyle='dashed', linewidth = 3, marker = 'o', markerfacecolor = 'blue', markersize = 12)
+
+for i in range(len(var_order)):
+    plt.annotate(str(var_order[i]),(city_graph_x[i],city_graph_y[i]),fontsize=20)
+f2 = plt.figure(2)
+plt.plot(range(11),best_of_gen, color = 'grey', linestyle = 'solid', linewidth = 0.5)
+plt.show()
+print(best_of_gen)
+
+#for i in range(8):
+#    print(cities[i][0])
+#print("next")
+#for i in range(8):
+#    print(cities[i][1])
